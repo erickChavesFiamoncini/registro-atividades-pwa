@@ -42,12 +42,12 @@ function handleSubmit() {
 }
 
 .task-input:focus {
-  border-color: #4a90d9;
+  border-color: #642db8;
 }
 
 .task-button {
   padding: 12px 20px;
-  background-color: #4a90d9;
+  background-color: #642db8;
   color: white;
   border: none;
   border-radius: 8px;
@@ -57,6 +57,6 @@ function handleSubmit() {
 }
 
 .task-button:hover {
-  background-color: #357abd;
+  background-color: #9654fa;
 }
 </style>

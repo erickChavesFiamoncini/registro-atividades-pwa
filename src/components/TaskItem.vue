@@ -9,7 +9,7 @@
       <span class="task-title">{{ task.title }}</span>
     </label>
     <button class="task-remove" @click="$emit('remove', task.id)">
-      Remover
+      <span class="mdi mdi-trash-can-outline"></span>
     </button>
   </div>
 </template>
@@ -53,7 +53,7 @@ defineEmits(['toggle', 'remove']);
 .task-label input[type='checkbox'] {
   width: 20px;
   height: 20px;
-  accent-color: #4a90d9;
+  accent-color: #642db8;
 }
 
 .task-title {
@@ -70,7 +70,7 @@ defineEmits(['toggle', 'remove']);
   border: none;
   color: #e74c3c;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 1rem;
   padding: 4px 8px;
 }
 

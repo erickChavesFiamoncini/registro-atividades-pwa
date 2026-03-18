@@ -14,13 +14,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 0;
-  border-bottom: 2px solid #4a90d9;
+  border-bottom: 3px solid #642db8;
   margin-bottom: 24px;
 }
 
 .app-header h1 {
   font-size: 1.4rem;
-  color: #4a90d9;
+  color: #642db8;
 }
 
 nav {
@@ -36,6 +36,6 @@ nav a {
 }
 
 nav a.router-link-active {
-  color: #4a90d9;
+  color: #642db8;
 }
 </style>
