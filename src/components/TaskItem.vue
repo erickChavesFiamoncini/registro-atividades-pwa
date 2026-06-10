@@ -76,7 +76,7 @@ defineEmits(['toggle', 'remove', 'edit'])
 .task-label input[type='checkbox'] {
   width: 20px;
   height: 20px;
-  accent-color: #4a90d9;
+  accent-color: #642db8;
 }
 
 .task-title {

@@ -58,4 +58,13 @@ nav a {
 nav a.router-link-active {
   color: #642db8;
 }
+nav button {
+  text-decoration: none;
+  color: #666;
+  font-weight: 500;
+  font-size: 0.9rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
 </style>

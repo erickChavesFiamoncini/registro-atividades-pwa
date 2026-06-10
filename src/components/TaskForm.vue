@@ -137,12 +137,12 @@ function handleCancel() {
 }
 
 .task-input:focus {
-  border-color: #4a90d9;
+  border-color: #642db8;
 }
 
 .task-button {
   padding: 12px 20px;
-  background-color: #4a90d9;
+  background-color: #642db8;
   color: white;
   border: none;
   border-radius: 8px;
@@ -152,7 +152,7 @@ function handleCancel() {
 }
 
 .task-button:hover:not(:disabled) {
-  background-color: #357abd;
+  background-color: #a66bff;
 }
 
 .task-button:disabled {
