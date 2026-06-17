@@ -1,15 +1,19 @@
-import { fileURLToPath, URL } from 'node:url';
+import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
-import vueDevTools from 'vite-plugin-vue-devtools';
-import { VitePWA } from 'vite-plugin-pwa';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vueDevTools from 'vite-plugin-vue-devtools'
+import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+
       manifest: {
         id: 'com.tarefas-pwa',
         name: 'Gerenciador de Tarefas',
@@ -41,6 +45,7 @@ export default defineConfig({
       },
       devOptions: {
         enabled: true,
+        type: 'module',
       },
     }),
     vueDevTools(),
@@ -50,4 +55,4 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-});
+})
