@@ -24,12 +24,22 @@ export const useTasksStore = defineStore('tasks', () => {
     }
   }
 
-  async function addTask(title) {
-    if (!title.trim()) return
+  async function addTask(payload) {
+    if (!payload.title?.trim()) return
     error.value = null
     try {
-      const response = await tasksApi.create(title.trim())
-      tasks.value.push(response.data)
+      const response = await tasksApi.create(payload)
+
+      // Pegamos a tarefa que o backend acabou de criar
+      const newTask = response.data
+
+      // Se o backend não nos devolveu a propriedade 'img_url' pronta,
+      // nós usamos o preview local que o navegador já tem na memória!
+      if (!newTask.img_url && payload.previewUrl) {
+        newTask.img_url = payload.previewUrl
+      }
+
+      tasks.value.push(newTask)
     } catch (err) {
       error.value = 'Erro ao adicionar tarefa.'
       console.error(err)

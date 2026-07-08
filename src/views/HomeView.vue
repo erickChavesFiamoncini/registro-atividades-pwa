@@ -40,7 +40,6 @@
         Nenhuma tarefa cadastrada. Adicione uma acima.
       </p>
     </template>
-
   </div>
 </template>
 
@@ -57,12 +56,13 @@ onMounted(() => {
   store.fetchTasks()
 })
 
-function handleAdd(title) {
-  store.addTask(title)
+function handleAdd(payload) {
+  store.addTask(payload)
 }
 
-function handleUpdate(id, title, imgAttachmentKey) {
-  store.updateTask(id, { title, imgAttachmentKey })
+// 🛠️ CORREÇÃO AQUI: Agora aceita o 'payload' diretamente vindo do TaskForm
+function handleUpdate(id, payload) {
+  store.updateTask(id, payload)
   editingTask.value = null
 }
 

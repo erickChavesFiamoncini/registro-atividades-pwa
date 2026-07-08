@@ -29,7 +29,7 @@ onMounted(() => {
     'Notification' in window &&
     Notification.permission === 'default' && //
     !localStorage.getItem('push_prompt_dismissed')
-  ) {
+  ) { 
     setTimeout(() => { visible.value = true }, 2000) //
   }
 })
