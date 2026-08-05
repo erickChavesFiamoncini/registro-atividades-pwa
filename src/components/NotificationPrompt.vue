@@ -29,7 +29,7 @@ onMounted(() => {
     'Notification' in window &&
     Notification.permission === 'default' && //
     !localStorage.getItem('push_prompt_dismissed')
-  ) { 
+  ) {
     setTimeout(() => { visible.value = true }, 2000) //
   }
 })
@@ -72,7 +72,7 @@ function dismiss() {
 .prompt-text p { margin: 0.2rem 0 0; font-size: 0.85rem; color: #718096; line-height: 1.4; }
 .prompt-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 .btn-allow {
-  padding: 0.4rem 1rem; background: #4a90d9; color: #fff;
+  padding: 0.4rem 1rem; background: #5725a3; color: #fff;
   border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
 }
 .btn-dismiss {

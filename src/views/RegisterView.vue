@@ -1,25 +1,33 @@
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
+import { useRouter, RouterLink } from "vue-router";
+import authApi from "@/api/authApi";
 
 const router = useRouter();
-const authStore = useAuthStore();
 
 const email = ref("");
 const password = ref("");
+const confirmPassword = ref("");
 const loading = ref(false);
 const errorMessage = ref("");
 
-async function handleLogin() {
-  loading.value = true;
+async function handleRegister() {
   errorMessage.value = "";
+
+  if (password.value !== confirmPassword.value) {
+    errorMessage.value = "As senhas não coincidem.";
+    return;
+  }
+
+  loading.value = true;
+
   try {
-    await authStore.login(email.value, password.value);
-    router.push("/");
+    await authApi.register(email.value, password.value);
+    router.push("/login");
   } catch (err) {
     errorMessage.value =
-      err.response?.data?.detail ?? "Erro ao entrar. Verifique suas credenciais.";
+      err.response?.data?.detail ??
+      "Erro ao criar conta. Tente novamente mais tarde.";
   } finally {
     loading.value = false;
   }
@@ -28,8 +36,8 @@ async function handleLogin() {
 
 <template>
   <div class="login-container">
-    <form class="login-form" @submit.prevent="handleLogin">
-      <h1>Entrar</h1>
+    <form class="login-form" @submit.prevent="handleRegister">
+      <h1>Criar Conta</h1>
 
       <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
 
@@ -53,16 +61,28 @@ async function handleLogin() {
           type="password"
           placeholder="••••••••"
           required
-          autocomplete="current-password"
+          autocomplete="new-password"
+        />
+      </div>
+
+      <div class="field">
+        <label for="confirmPassword">Confirmar Senha</label>
+        <input
+          id="confirmPassword"
+          v-model="confirmPassword"
+          type="password"
+          placeholder="••••••••"
+          required
+          autocomplete="new-password"
         />
       </div>
 
       <button type="submit" :disabled="loading">
-        {{ loading ? "Entrando..." : "Entrar" }}
+        {{ loading ? "Cadastrando..." : "Cadastrar" }}
       </button>
 
       <div class="criar">
-        <p>Não possui uma conta? <RouterLink to="/register">Criar</RouterLink></p>
+        <p>Já possui uma conta? <RouterLink to="/login">Entrar</RouterLink></p>
       </div>
     </form>
   </div>
@@ -78,7 +98,7 @@ async function handleLogin() {
   font-weight: bold;
   text-decoration: none;
 }
-.criar a:hover{
+.criar a:hover {
   text-decoration: underline;
 }
 .login-container {

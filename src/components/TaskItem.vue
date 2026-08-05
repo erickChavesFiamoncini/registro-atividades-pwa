@@ -1,20 +1,6 @@
-Aqui está o seu arquivo `TaskItem.vue` totalmente repaginado e corrigido.
-
-### 🛠️ O que mudou?
-
-* **Correção da Imagem Gigante:** A imagem dentro do dialog agora tem um controle inteligente de tamanho máximo (`max-width: 400px` e `max-height: 70vh`), impedindo que ela quebre o layout e garantindo que ela mantenha a proporção original (`object-fit: contain`).
-* **Visual do Dialog Modernizado:** Transformei o dialog em um modal elegante centralizado na tela, adicionando um efeito de fundo semi-transparente fosco (`backdrop-filter`) para dar destaque à imagem.
-* **Botão "Fechar" Estilizado:** Deixou de ser um botão simples de sistema e ganhou um visual limpo, com cantos arredondados, transição suave de cor e posicionamento correto.
-* **Responsividade (Mobile First):** Adicionei regras de `@media` para telas menores que 480px. No celular, o dialog se ajusta para ocupar quase toda a largura da tela (`width: 90%`), e a imagem diminui proporcionalmente sem transbordar, mantendo a interface impecável.
-
----
-
-### `TaskItem.vue` Refatorado
-
-```html
 <template>
   <div class="task-item" :class="{ done: task.done }">
-    <button v-if="task.img_url" class="img-indicator" @click="showImage = true" title="Ver imagem">
+    <button v-if="task.img_url" class="img-indicator" @click="showImage = true" title="Ver imagem e localização">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -36,17 +22,40 @@ Aqui está o seu arquivo `TaskItem.vue` totalmente repaginado e corrigido.
   <dialog v-if="showImage" open class="image-dialog" @click.self="showImage = false">
     <div class="dialog-content">
       <img :src="task.img_url" alt="Imagem da tarefa" class="dialog-img" />
+
+      <!-- Bloco de Geolocalização (exibido apenas se existirem coordenadas válidas) -->
+      <div v-if="hasGeolocation" class="dialog-geo-info">
+        <div class="geo-header">
+          <span class="geo-icon">📍</span>
+          <strong>Localização da Captura</strong>
+        </div>
+
+        <ul class="geo-details">
+          <li><strong>Coordenadas:</strong> {{ formattedCoordinates }}</li>
+          <li v-if="task.geolocation_accuracy !== undefined && task.geolocation_accuracy !== null">
+            <strong>Precisão:</strong> ~{{ Math.round(task.geolocation_accuracy) }}m
+          </li>
+          <li v-if="task.geolocation_timestamp">
+            <strong>Data/Hora:</strong> {{ formattedTimestamp }}
+          </li>
+        </ul>
+
+        <a :href="googleMapsUrl" target="_blank" rel="noopener noreferrer" class="maps-link">
+          🗺️ Abrir no Google Maps
+        </a>
+      </div>
+
       <button class="btn-close-dialog" @click="showImage = false">Fechar</button>
     </div>
   </dialog>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const showImage = ref(false)
 
-defineProps({
+const props = defineProps({
   task: {
     type: Object,
     required: true,
@@ -54,6 +63,39 @@ defineProps({
 })
 
 defineEmits(['toggle', 'remove', 'edit'])
+
+// Computadas para a Geolocalização
+const hasGeolocation = computed(() => {
+  return (
+    props.task.latitude !== null &&
+    props.task.latitude !== undefined &&
+    props.task.longitude !== null &&
+    props.task.longitude !== undefined &&
+    (props.task.latitude !== 0 || props.task.longitude !== 0)
+  )
+})
+
+const formattedCoordinates = computed(() => {
+  if (!hasGeolocation.value) return ''
+  return `${props.task.latitude.toFixed(5)}, ${props.task.longitude.toFixed(5)}`
+})
+
+const formattedTimestamp = computed(() => {
+  if (!props.task.geolocation_timestamp) return ''
+  const date = new Date(props.task.geolocation_timestamp)
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+})
+
+const googleMapsUrl = computed(() => {
+  if (!hasGeolocation.value) return '#'
+  return `https://www.google.com/maps?q=${props.task.latitude},${props.task.longitude}`
+})
 </script>
 
 <style scoped>
@@ -86,7 +128,7 @@ defineEmits(['toggle', 'remove', 'edit'])
   gap: 12px;
   cursor: pointer;
   flex: 1;
-  min-width: 0; /* Evita que o texto quebre o flexbox */
+  min-width: 0;
 }
 
 .task-label input[type='checkbox'] {
@@ -171,7 +213,7 @@ defineEmits(['toggle', 'remove', 'edit'])
   width: 100vw;
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px); /* Suave desfoque de fundo estilo iOS/Premium */
+  backdrop-filter: blur(4px);
   border: none;
   display: flex;
   align-items: center;
@@ -189,19 +231,58 @@ defineEmits(['toggle', 'remove', 'edit'])
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  width: auto;
-  max-width: 440px; /* Base robusta para desktops */
+  width: 100%;
+  max-width: 440px;
   animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Configuração de tamanho controlado da imagem */
 .dialog-img {
   width: 100%;
   max-width: 400px;
-  max-height: 60vh; /* Ocupa no máximo 60% da altura disponível da tela */
+  max-height: 50vh;
   object-fit: contain;
   border-radius: 8px;
   border: 1px solid #eee;
+}
+
+/* --- ESTILOS DA GEOLOCALIZAÇÃO NO MODAL --- */
+.dialog-geo-info {
+  width: 100%;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.85rem;
+  color: #495057;
+  box-sizing: border-box;
+}
+
+.geo-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #642db8;
+}
+
+.geo-details {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.maps-link {
+  display: inline-block;
+  color: #4a90d9;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.maps-link:hover {
+  text-decoration: underline;
 }
 
 /* Botão Fechar Estilizado */
@@ -252,7 +333,7 @@ defineEmits(['toggle', 'remove', 'edit'])
   }
 
   .dialog-img {
-    max-height: 50vh;
+    max-height: 40vh;
   }
 
   .btn-close-dialog {
@@ -260,4 +341,3 @@ defineEmits(['toggle', 'remove', 'edit'])
   }
 }
 </style>
-

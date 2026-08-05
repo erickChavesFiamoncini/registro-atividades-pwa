@@ -23,7 +23,8 @@
         alt="Imagem da tarefa"
       />
 
-      <label class="image-label" :class="{ disabled: uploading }">
+      <!-- Oculta a seleção padrão enquanto o preview ao vivo estiver aberto -->
+      <label v-if="!showCameraCapture" class="image-label" :class="{ disabled: uploading }">
         <span v-if="uploading" class="upload-status">Enviando...</span>
         <span v-else>
           {{
@@ -38,12 +39,21 @@
         <input
           type="file"
           accept="image/jpeg,image/png"
-          :capture="isMobileDevice ? 'environment' : undefined"
+          :capture="isMobileDevice ? cameraMode : undefined"
           class="image-input"
           :disabled="uploading"
           @change="handleImageChange"
         />
       </label>
+
+      <button
+        v-if="isMobileDevice && !previewUrl"
+        type="button"
+        class="task-button-secondary"
+        @click="toggleCamera"
+      >
+        {{ cameraMode === 'environment' ? 'Usar selfie' : 'Usar traseira' }}
+      </button>
 
       <button
         v-if="isMobileDevice"
@@ -54,7 +64,18 @@
         {{ showCameraCapture ? 'Fechar câmera' : 'Abrir preview ao vivo' }}
       </button>
 
+      <!-- Integração com o CameraCapture.vue -->
       <CameraCapture v-if="isMobileDevice && showCameraCapture" @captured="handleCameraCapture" />
+
+      <!-- Exibição discreta das coordenadas capturadas com a foto -->
+      <p v-if="coords" class="geo-info">
+        📍 Localização capturada: {{ coords.latitude.toFixed(4) }}, {{ coords.longitude.toFixed(4) }}
+        <span v-if="coords.accuracy">(~{{ Math.round(coords.accuracy) }}m)</span>
+      </p>
+
+      <p v-if="!hasCamera" class="camera-warning">
+        Câmera não detectada. Você pode selecionar um arquivo manualmente.
+      </p>
 
       <p class="image-help">
         {{ isMobileDevice ? 'O botão acima abrirá a câmera do seu celular.' : 'Seletor de arquivos habilitado para Computador.' }}
@@ -84,15 +105,25 @@ const imgAttachmentKey = ref(null)
 const uploading = ref(false)
 const showCameraCapture = ref(false)
 const isMobileDevice = ref(false)
+const cameraMode = ref('environment')
+const hasCamera = ref(false)
 
-// Detecção segura de Mobile no ciclo de vida correto (Client-Side)
-onMounted(() => {
+// Estado expandido para geolocalização da foto
+const coords = ref(null)
+
+async function checkCameraSupport() {
+  if (!navigator.mediaDevices?.enumerateDevices) return false
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  return devices.some((d) => d.kind === 'videoinput')
+}
+
+onMounted(async () => {
   isMobileDevice.value = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
     navigator.userAgent
   )
+  hasCamera.value = await checkCameraSupport()
 })
 
-// Monitora alterações na tarefa sob edição
 watch(
   () => props.editingTask,
   (task) => {
@@ -103,9 +134,18 @@ watch(
     if (task) {
       newTask.value = task.title
       previewUrl.value = task.img_url || null
+      coords.value = task.latitude && task.longitude
+        ? {
+            latitude: task.latitude,
+            longitude: task.longitude,
+            accuracy: task.geolocation_accuracy || null,
+            timestamp: task.geolocation_timestamp || null,
+          }
+        : null
     } else {
       newTask.value = ''
       previewUrl.value = null
+      coords.value = null
     }
 
     imgAttachmentKey.value = null
@@ -114,30 +154,76 @@ watch(
   { immediate: true }
 )
 
-// Helper para limpar previsualizações locais sem revogar links remotos (http)
+function toggleCamera() {
+  cameraMode.value = cameraMode.value === 'environment' ? 'user' : 'environment'
+}
+
 function limparPrevisualizacao() {
   if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(previewUrl.value)
   }
   previewUrl.value = null
   imgAttachmentKey.value = null
+  coords.value = null
   showCameraCapture.value = false
 }
 
-// Upload via arquivo padrão
+// Captura a localização detalhada no exato momento do registro da foto
+function obterGeolocalizacaoFoto() {
+  if (!('geolocation' in navigator)) return
+
+  const optionsHighAccuracy = {
+    enableHighAccuracy: true,
+    timeout: 15000, // Aumentado para 15s para evitar TIMEOUT
+    maximumAge: 60000, // Aceita localização em cache de até 1 minuto
+  }
+
+  const optionsLowAccuracy = {
+    enableHighAccuracy: false, // Fallback rápido via rede/Wi-Fi
+    timeout: 10000,
+    maximumAge: 300000,
+  }
+
+  const onSuccess = (position) => {
+    coords.value = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+      timestamp: new Date(position.timestamp).toISOString(),
+    }
+  }
+
+  const onError = (err) => {
+    console.warn('Tentativa com alta precisão falhou, tentando fallback...', err)
+
+    // Se falhar por timeout ou indisponibilidade, tenta via precisão padrão (rede/IP)
+    if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+      navigator.geolocation.getCurrentPosition(
+        onSuccess,
+        (fallbackErr) => {
+          console.warn('Não foi possível obter a localização no momento da foto:', fallbackErr)
+        },
+        optionsLowAccuracy
+      )
+    }
+  }
+
+  navigator.geolocation.getCurrentPosition(onSuccess, onError, optionsHighAccuracy)
+}
+
 async function handleImageChange(event) {
   const file = event.target.files[0]
   if (!file) return
+  obterGeolocalizacaoFoto()
   await processarEEnviarImagem(file)
 }
 
-// Upload via captura customizada da câmera
 async function handleCameraCapture(file) {
+  obterGeolocalizacaoFoto()
   await processarEEnviarImagem(file)
   showCameraCapture.value = false
 }
 
-// Abstração da lógica de tratamento e upload da imagem
 async function processarEEnviarImagem(file) {
   if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
     URL.revokeObjectURL(previewUrl.value)
@@ -160,10 +246,15 @@ async function processarEEnviarImagem(file) {
 function handleSubmit() {
   if (!newTask.value.trim()) return
 
+  // Payload completo formatado exatamente conforme a estrutura do seu backend
   const payload = {
     title: newTask.value.trim(),
     imgAttachmentKey: imgAttachmentKey.value,
     previewUrl: previewUrl.value,
+    latitude: coords.value?.latitude ?? null,
+    longitude: coords.value?.longitude ?? null,
+    geolocation_accuracy: coords.value?.accuracy ?? null,
+    geolocation_timestamp: coords.value?.timestamp ?? null,
   }
 
   if (props.editingTask) {
@@ -326,6 +417,19 @@ function handleCancel() {
   font-weight: 500;
 }
 
+.camera-warning {
+  font-size: 0.75rem;
+  color: #e67e22;
+  margin: 0;
+}
+
+.geo-info {
+  font-size: 0.75rem;
+  color: #27ae60;
+  margin: 0;
+  flex-basis: 100%;
+}
+
 .image-help {
   font-size: 0.75rem;
   color: #777;
@@ -333,23 +437,21 @@ function handleCancel() {
   flex-basis: 100%;
 }
 
-/* 📱 --- REGRAS DE MEIOS / MEDIA QUERIES PARA MOBILE --- */
 @media (max-width: 580px) {
   .task-row {
-    flex-direction: column; /* Input em cima, botões embaixo */
+    flex-direction: column;
     gap: 10px;
   }
 
   .task-input {
-    width: 100%; /* Ocupa tudo */
+    width: 100%;
   }
 
-  /* Cria um container invisível flexível para os botões ficarem emparelhados */
   .task-button,
   .task-button-cancel {
     width: 100%;
     text-align: center;
-    padding: 14px; /* Área de toque um pouco maior para Mobile */
+    padding: 14px;
   }
 
   .image-section {
@@ -357,10 +459,9 @@ function handleCancel() {
     padding: 10px;
   }
 
-  /* Modifica os botões de ação com imagem para ocupar linhas cheias se necessário */
   .image-label,
   .task-button-secondary {
-    flex: 1; /* Dividem o espaço uniformemente se estiverem na mesma linha */
+    flex: 1;
     min-width: 140px;
     padding: 12px;
     font-size: 0.85rem;
