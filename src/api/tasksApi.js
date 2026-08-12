@@ -5,10 +5,17 @@ const tasksApi = {
     return apiClient.get('/tasks')
   },
 
-  create(payload) {
-    // Sem as chaves {}, assim o axios envia os dados direto na raiz
-    return apiClient.post('/tasks', payload)
-  },
+create(payload) {
+  console.log('PAYLOAD ENVIADO:', payload)
+  console.log('TIMESTAMP:', payload.geolocation_timestamp)
+  console.log(
+    'TIPO:',
+    typeof payload.geolocation_timestamp,
+    payload.geolocation_timestamp instanceof Date
+  )
+
+  return apiClient.post('/tasks', payload)
+},
 
   update(id, data) {
     return apiClient.patch(`/tasks/${id}`, data)

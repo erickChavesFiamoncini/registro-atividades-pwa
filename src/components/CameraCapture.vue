@@ -165,7 +165,7 @@ function stopCamera() {
   max-height: 300px;
   object-fit: contain;
   border-radius: 8px;
-  border: 2px solid #4a90d9;
+  border: 2px solid #642db8;
 }
 
 .camera-actions {
@@ -180,7 +180,7 @@ function stopCamera() {
   border-radius: 6px;
   font-size: 0.875rem;
   cursor: pointer;
-  background: #4a90d9;
+  background: #642db8;
   color: white;
 }
 
