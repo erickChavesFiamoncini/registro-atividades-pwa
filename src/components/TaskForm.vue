@@ -8,12 +8,8 @@
         class="task-input"
       />
 
-      <button
-        type="submit"
-        class="task-button"
-        :disabled="uploading"
-      >
-        {{ editingTask ? 'Alterar' : 'Adicionar' }}
+      <button type="submit" class="task-button" :disabled="uploading">
+        {{ editingTask ? "Alterar" : "Adicionar" }}
       </button>
 
       <button
@@ -36,23 +32,11 @@
       />
 
       <!-- Selecionar imagem / câmera do celular -->
-      <label
-        class="image-label"
-        :class="{ disabled: uploading }"
-      >
-        <span
-          v-if="uploading"
-          class="upload-status"
-        >
-          Enviando...
-        </span>
+      <label class="image-label" :class="{ disabled: uploading }">
+        <span v-if="uploading" class="upload-status"> Enviando... </span>
 
         <span v-else>
-          {{
-            previewUrl || editingTask?.img_url
-              ? 'Trocar imagem'
-              : 'Adicionar imagem'
-          }}
+          {{ previewUrl || editingTask?.img_url ? "Trocar imagem" : "Adicionar imagem" }}
         </span>
 
         <input
@@ -72,23 +56,49 @@
         :disabled="uploading"
         @click="showCameraCapture = !showCameraCapture"
       >
-        {{
-          showCameraCapture
-            ? 'Fechar câmera'
-            : 'Abrir câmera'
-        }}
+        {{ showCameraCapture ? "Fechar câmera" : "Abrir câmera" }}
       </button>
 
       <!-- Componente da câmera -->
-      <CameraCapture
-        v-if="showCameraCapture"
-        @captured="handleCameraCapture"
-      />
+      <CameraCapture v-if="showCameraCapture" @captured="handleCameraCapture" />
 
       <p class="image-help">
-        Em celular, você pode usar a câmera pelo botão
-        "Adicionar imagem" ou pelo preview ao vivo.
+        Em celular, você pode usar a câmera pelo botão "Adicionar imagem" ou pelo preview
+        ao vivo.
       </p>
+    </div>
+    <div class="location-section">
+      <div class="location-header">
+        <strong>Localização</strong>
+
+        <button
+          type="button"
+          class="location-button"
+          :disabled="loadingLocation"
+          @click="handleGetLocation"
+        >
+          {{ loadingLocation ? "Obtendo localização..." : "Usar minha localização" }}
+        </button>
+      </div>
+
+      <p v-if="location?.label" class="location-label">
+        {{ location.label }}
+      </p>
+
+      <p v-if="locationError" class="location-error">
+        {{ locationError }}
+      </p>
+
+      <TaskLocationMap v-if="location" :location="location" />
+
+      <button
+        v-if="location"
+        type="button"
+        class="location-remove-button"
+        @click="clearLocation"
+      >
+        Remover localização
+      </button>
     </div>
   </form>
 </template>
@@ -97,135 +107,159 @@
 import { ref, watch } from 'vue'
 import tasksApi from '../api/tasksApi.js'
 import CameraCapture from './CameraCapture.vue'
+import TaskLocationMap from './TaskLocationMap.vue'
+import { useGeolocation } from '../composables/useGeolocation.js'
+import geocodingApi from "../api/geocodingApi.js";
+import { buildLocationPayload } from '../utils/location.js'
 
 const props = defineProps({
   editingTask: {
     type: Object,
     default: null,
   },
-})
+});
 
-const emit = defineEmits([
-  'add',
-  'update',
-  'cancel',
-])
+const emit = defineEmits(["add", "update", "cancel"]);
 
-const newTask = ref('')
-const previewUrl = ref(null)
-const imgAttachmentKey = ref(null)
-const uploading = ref(false)
-const showCameraCapture = ref(false)
+const {
+  location,
+  loadingLocation,
+  locationError,
+  requestCurrentLocation,
+  setLocationFromTask,
+  setLocationLabel,
+  clearLocation,
+} = useGeolocation();
+
+const newTask = ref("");
+const previewUrl = ref(null);
+const imgAttachmentKey = ref(null);
+const uploading = ref(false);
+const showCameraCapture = ref(false);
 
 watch(
   () => props.editingTask,
   (task) => {
-    newTask.value = task ? task.title : ''
+    newTask.value = task ? task.title : "";
 
     if (previewUrl.value) {
-      URL.revokeObjectURL(previewUrl.value)
+      URL.revokeObjectURL(previewUrl.value);
     }
 
-    previewUrl.value = null
-    imgAttachmentKey.value = null
-    showCameraCapture.value = false
-  },
-)
+    previewUrl.value = null;
+    imgAttachmentKey.value = null;
+    showCameraCapture.value = false;
+
+    if (task) {
+      setLocationFromTask(task);
+    } else {
+      clearLocation();
+    }
+  }
+);
 
 async function handleImageChange(event) {
-  const file = event.target.files[0]
+  const file = event.target.files[0];
 
-  if (!file) return
+  if (!file) return;
 
   if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value);
   }
 
-  previewUrl.value = URL.createObjectURL(file)
-  uploading.value = true
+  previewUrl.value = URL.createObjectURL(file);
+  uploading.value = true;
 
   try {
-    const response = await tasksApi.uploadImage(file)
+    const response = await tasksApi.uploadImage(file);
 
-    imgAttachmentKey.value =
-      response.data.attachment_key
+    imgAttachmentKey.value = response.data.attachment_key;
   } catch (err) {
-    console.error(
-      'Erro ao fazer upload da imagem',
-      err,
-    )
+    console.error("Erro ao fazer upload da imagem", err);
 
-    previewUrl.value = null
-    imgAttachmentKey.value = null
+    previewUrl.value = null;
+    imgAttachmentKey.value = null;
   } finally {
-    uploading.value = false
+    uploading.value = false;
   }
 }
 
 async function handleCameraCapture(file) {
   if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value);
   }
 
-  previewUrl.value = URL.createObjectURL(file)
-  uploading.value = true
+  previewUrl.value = URL.createObjectURL(file);
+  uploading.value = true;
 
   try {
-    const response = await tasksApi.uploadImage(file)
+    const response = await tasksApi.uploadImage(file);
 
-    imgAttachmentKey.value =
-      response.data.attachment_key
+    imgAttachmentKey.value = response.data.attachment_key;
 
-    showCameraCapture.value = false
+    showCameraCapture.value = false;
   } catch (err) {
-    console.error(
-      'Erro ao fazer upload da foto da câmera',
-      err,
-    )
+    console.error("Erro ao fazer upload da foto da câmera", err);
 
-    previewUrl.value = null
-    imgAttachmentKey.value = null
+    previewUrl.value = null;
+    imgAttachmentKey.value = null;
   } finally {
-    uploading.value = false
+    uploading.value = false;
   }
 }
 
 function handleSubmit() {
-  if (!newTask.value.trim()) return
+  if (!newTask.value.trim()) return;
 
   const payload = {
     title: newTask.value.trim(),
     img_attachment_key: imgAttachmentKey.value,
-  }
+    ...buildLocationPayload(location.value),
+  };
 
   if (props.editingTask) {
     emit(
-      'update',
+      "update",
       props.editingTask.id,
       payload,
-    )
+    );
   } else {
-    emit('add', payload)
+    emit("add", payload);
   }
 
-  newTask.value = ''
-  previewUrl.value = null
-  imgAttachmentKey.value = null
-  showCameraCapture.value = false
+  newTask.value = "";
+  previewUrl.value = null;
+  imgAttachmentKey.value = null;
+  showCameraCapture.value = false;
+  clearLocation();
 }
 
 function handleCancel() {
-  newTask.value = ''
+  newTask.value = "";
 
   if (previewUrl.value) {
-    URL.revokeObjectURL(previewUrl.value)
+    URL.revokeObjectURL(previewUrl.value);
   }
 
-  previewUrl.value = null
-  imgAttachmentKey.value = null
-  showCameraCapture.value = false
+  previewUrl.value = null;
+  imgAttachmentKey.value = null;
+  showCameraCapture.value = false;
+  clearLocation();
 
-  emit('cancel')
+  emit("cancel");
+}
+
+async function handleGetLocation() {
+  const captured = await requestCurrentLocation();
+  if (!captured) return;
+
+  try {
+    const address = await geocodingApi.reverse(captured.latitude, captured.longitude);
+
+    setLocationLabel(address?.label ?? null);
+  } catch {
+    locationError.value = "Localização obtida, mas não foi possível identificar a rua.";
+  }
 }
 </script>
 
