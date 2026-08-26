@@ -31,12 +31,20 @@
         alt="Imagem da tarefa"
       />
 
-      <!-- Selecionar imagem / câmera do celular -->
-      <label class="image-label" :class="{ disabled: uploading }">
+      <!-- Selecionar arquivo / input padrão (oculto quando a câmera ao vivo estiver aberta) -->
+      <label
+        v-if="!showCameraCapture"
+        class="image-label"
+        :class="{ disabled: uploading }"
+      >
         <span v-if="uploading" class="upload-status"> Enviando... </span>
 
         <span v-else>
-          {{ previewUrl || editingTask?.img_url ? "Trocar imagem" : "Adicionar imagem" }}
+          {{
+            previewUrl || editingTask?.img_url
+              ? "📁 Trocar imagem"
+              : "📁 Adicionar imagem"
+          }}
         </span>
 
         <input
@@ -49,18 +57,23 @@
         />
       </label>
 
-      <!-- Câmera com getUserMedia -->
+      <!-- Exibe o botão "Abrir câmera" APENAS quando a câmera estiver fechada -->
       <button
+        v-if="!showCameraCapture"
         type="button"
         class="task-button-camera"
         :disabled="uploading"
-        @click="showCameraCapture = !showCameraCapture"
+        @click="showCameraCapture = true"
       >
-        {{ showCameraCapture ? "Fechar câmera" : "Abrir câmera" }}
+        Abrir câmera
       </button>
 
-      <!-- Componente da câmera -->
-      <CameraCapture v-if="showCameraCapture" @captured="handleCameraCapture" />
+      <!-- Componente da Câmera -->
+      <CameraCapture
+        v-if="showCameraCapture"
+        @captured="handleCameraCapture"
+        @close="showCameraCapture = false"
+      />
 
       <p class="image-help">
         Em celular, você pode usar a câmera pelo botão "Adicionar imagem" ou pelo preview
@@ -104,13 +117,13 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import tasksApi from '../api/tasksApi.js'
-import CameraCapture from './CameraCapture.vue'
-import TaskLocationMap from './TaskLocationMap.vue'
-import { useGeolocation } from '../composables/useGeolocation.js'
+import { ref, watch } from "vue";
+import tasksApi from "../api/tasksApi.js";
+import CameraCapture from "./CameraCapture.vue";
+import TaskLocationMap from "./TaskLocationMap.vue";
+import { useGeolocation } from "../composables/useGeolocation.js";
 import geocodingApi from "../api/geocodingApi.js";
-import { buildLocationPayload } from '../utils/location.js'
+import { buildLocationPayload } from "../utils/location.js";
 
 const props = defineProps({
   editingTask: {
@@ -158,6 +171,10 @@ watch(
   }
 );
 
+function toggleCamera() {
+  showCameraCapture.value = !showCameraCapture.value;
+}
+
 async function handleImageChange(event) {
   const file = event.target.files[0];
 
@@ -194,17 +211,15 @@ async function handleCameraCapture(file) {
 
   try {
     const response = await tasksApi.uploadImage(file);
-
     imgAttachmentKey.value = response.data.attachment_key;
-
-    showCameraCapture.value = false;
   } catch (err) {
     console.error("Erro ao fazer upload da foto da câmera", err);
-
     previewUrl.value = null;
     imgAttachmentKey.value = null;
   } finally {
     uploading.value = false;
+    // Garante que o painel da câmera feche após a captura
+    showCameraCapture.value = false;
   }
 }
 
@@ -218,11 +233,7 @@ function handleSubmit() {
   };
 
   if (props.editingTask) {
-    emit(
-      "update",
-      props.editingTask.id,
-      payload,
-    );
+    emit("update", props.editingTask.id, payload);
   } else {
     emit("add", payload);
   }
@@ -256,9 +267,15 @@ async function handleGetLocation() {
   try {
     const address = await geocodingApi.reverse(captured.latitude, captured.longitude);
 
-    setLocationLabel(address?.label ?? null);
-  } catch {
-    locationError.value = "Localização obtida, mas não foi possível identificar a rua.";
+    if (address?.label) {
+      setLocationLabel(address.label);
+    } else {
+      setLocationLabel("Endereço não encontrado");
+    }
+  } catch (err) {
+    console.error("Erro na busca do endereço:", err);
+    locationError.value =
+      "Localização obtida, mas não foi possível identificar o endereço.";
   }
 }
 </script>
@@ -398,5 +415,104 @@ async function handleGetLocation() {
 
 .upload-status {
   color: #888;
+}
+/* ==========================================================================
+   Seção de Localização (TaskForm.vue)
+   ========================================================================== */
+
+.location-section {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.location-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.location-header strong {
+  font-size: 0.95rem;
+  color: #2d3748;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.location-header strong::before {
+  content: "📍";
+  font-size: 1rem;
+}
+
+.location-button {
+  padding: 8px 14px;
+  background-color: #f3e8ff;
+  color: #642db8;
+  border: 1px solid #d8b4fe;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.location-button:hover:not(:disabled) {
+  background-color: #642db8;
+  color: #ffffff;
+  border-color: #642db8;
+  box-shadow: 0 2px 6px rgba(100, 45, 184, 0.25);
+}
+
+.location-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.location-label {
+  margin: 0;
+  padding: 8px 12px;
+  background-color: #f8fafc;
+  border-left: 3px solid #642db8;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.875rem;
+  color: #4a5568;
+  line-height: 1.4;
+}
+
+.location-error {
+  margin: 0;
+  padding: 8px 12px;
+  background-color: #fff5f5;
+  border-left: 3px solid #e53e3e;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.85rem;
+  color: #c53030;
+}
+
+.location-remove-button {
+  align-self: flex-start;
+  padding: 6px 12px;
+  background-color: transparent;
+  color: #e53e3e;
+  border: 1px solid #fed7d7;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.location-remove-button:hover {
+  background-color: #fff5f5;
+  border-color: #e53e3e;
 }
 </style>

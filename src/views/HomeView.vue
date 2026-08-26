@@ -60,7 +60,6 @@ function handleAdd(payload) {
   store.addTask(payload)
 }
 
-// 🛠️ CORREÇÃO AQUI: Agora aceita o 'payload' diretamente vindo do TaskForm
 function handleUpdate(id, payload) {
   store.updateTask(id, payload)
   editingTask.value = null

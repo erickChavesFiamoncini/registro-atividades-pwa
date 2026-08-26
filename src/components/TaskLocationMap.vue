@@ -62,9 +62,11 @@ onBeforeUnmount(() => map?.remove())
 <style scoped>
 .task-location-map {
   width: 100%;
-  height: 240px;
-  margin-top: 12px;
-  border-radius: 8px;
+  height: 220px;
+  border-radius: 10px;
   overflow: hidden;
+  border: 1px solid #e2e8f0;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.05);
+  z-index: 1; /* Garante que os controles do Leaflet não fiquem sobrepondo outros elementos */
 }
 </style>

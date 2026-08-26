@@ -1,5 +1,6 @@
 <template>
   <div class="camera-capture">
+
     <video
       ref="videoRef"
       autoplay
@@ -16,15 +17,7 @@
     />
 
     <div class="camera-actions">
-      <button
-        v-if="!streamActive"
-        type="button"
-        class="camera-btn"
-        @click="startCamera"
-      >
-        Abrir câmera
-      </button>
-
+      <!-- Tira a foto se a câmera estiver ativa e ainda não tiver capturado -->
       <button
         v-if="streamActive && !captured"
         type="button"
@@ -34,6 +27,7 @@
         Fotografar
       </button>
 
+      <!-- Permite refazer a foto se já capturou -->
       <button
         v-if="captured"
         type="button"
@@ -43,11 +37,11 @@
         Refazer
       </button>
 
+      <!-- Botão para fechar a câmera -->
       <button
-        v-if="streamActive"
         type="button"
         class="camera-btn danger"
-        @click="stopCamera"
+        @click="closeCamera"
       >
         Fechar câmera
       </button>
@@ -58,9 +52,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 
-const emit = defineEmits(['captured']);
+const emit = defineEmits(['captured', 'close']);
 
 const videoRef = ref(null);
 const captured = ref(false);
@@ -69,6 +63,16 @@ const capturedFile = ref(null);
 const streamActive = ref(false);
 const error = ref(null);
 let stream = null;
+
+// Inicializa a câmera assim que o componente é montado na tela
+onMounted(() => {
+  startCamera();
+});
+
+// Garante que o hardware da câmera seja liberado se o componente for destruído
+onUnmounted(() => {
+  stopStream();
+});
 
 async function startCamera() {
   error.value = null;
@@ -81,7 +85,9 @@ async function startCamera() {
       },
       audio: false,
     });
-    videoRef.value.srcObject = stream;
+    if (videoRef.value) {
+      videoRef.value.srcObject = stream;
+    }
     streamActive.value = true;
     captured.value = false;
   } catch (err) {
@@ -128,16 +134,21 @@ function retake() {
   captured.value = false;
 }
 
-function stopCamera() {
+function stopStream() {
   if (stream) {
     stream.getTracks().forEach((track) => track.stop());
     stream = null;
   }
   streamActive.value = false;
+}
+
+function closeCamera() {
+  stopStream();
   if (capturedUrl.value) URL.revokeObjectURL(capturedUrl.value);
   capturedUrl.value = null;
   capturedFile.value = null;
   captured.value = false;
+  emit('close');
 }
 </script>
 
@@ -150,10 +161,12 @@ function stopCamera() {
 
 .camera-preview {
   width: 100%;
+  max-width: 400px;
   max-height: 300px;
   object-fit: contain;
   background: #000;
   border-radius: 8px;
+  align-self: center; /* Força o alinhamento central no container Flex */
 }
 
 .camera-preview.hidden {
@@ -162,10 +175,12 @@ function stopCamera() {
 
 .camera-result {
   width: 100%;
+  max-width: 400px;
   max-height: 300px;
   object-fit: contain;
   border-radius: 8px;
   border: 2px solid #642db8;
+  align-self: center; /* Força o alinhamento central no container Flex */
 }
 
 .camera-actions {

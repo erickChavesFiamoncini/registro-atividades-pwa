@@ -6,6 +6,7 @@ import { usePushNotifications } from '../composables/usePushNotifications'
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem('access_token'))
   const refreshToken = ref(localStorage.getItem('refresh_token'))
+  const userEmail = ref(localStorage.getItem('user_email') || '') // Novo estado para o e-mail
 
   const isAuthenticated = computed(() => !!accessToken.value)
 
@@ -15,14 +16,19 @@ export const useAuthStore = defineStore('auth', () => {
     const { data } = await authApi.login(email, password)
     accessToken.value = data.access_token
     refreshToken.value = data.refresh_token
+
+    // Se a API não retornar o e-mail no data, usamos o próprio parâmetro da função
+    const emailToSave = data.user?.email || email
+    userEmail.value = emailToSave
+
     localStorage.setItem('access_token', data.access_token)
     localStorage.setItem('refresh_token', data.refresh_token)
+    localStorage.setItem('user_email', emailToSave)
 
-    // Se a permissão já foi concedida, subscribe agora — sem await para não bloquear o login
     if (
       'serviceWorker' in navigator &&
       'Notification' in window &&
-      Notification.permission === 'granted' //
+      Notification.permission === 'granted'
     ) {
       navigator.serviceWorker.ready
         .then((reg) => subscribe(reg))
@@ -31,12 +37,23 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    await unsubscribe() //
+    await unsubscribe()
     accessToken.value = null
     refreshToken.value = null
+    userEmail.value = ''
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user_email')
   }
 
-  return { accessToken, refreshToken, isAuthenticated, login, logout, requestPermission, subscribe }
+  return {
+    accessToken,
+    refreshToken,
+    userEmail, // Exporta a variável
+    isAuthenticated,
+    login,
+    logout,
+    requestPermission,
+    subscribe
+  }
 })

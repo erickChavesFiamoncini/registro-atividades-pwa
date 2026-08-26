@@ -1,12 +1,42 @@
 <template>
   <div class="task-item" :class="{ done: task.done }">
-    <button v-if="task.img_url" class="img-indicator" @click="showImage = true" title="Ver imagem e localização">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-        <circle cx="12" cy="13" r="4" />
-      </svg>
-    </button>
+    <!-- Indicadores visuais lado a lado -->
+    <div class="task-indicators">
+      <!-- Ícone de Câmera (exibido se houver imagem) -->
+      <button
+        v-if="task.img_url"
+        class="img-indicator"
+        @click="handleOpenModal"
+        title="Ver imagem e localização"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+          />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
+
+      <!-- Ícone de Pin de Localização (exibido se houver coordenadas) -->
+      <button
+        v-if="hasGeolocation"
+        class="geo-indicator-btn"
+        @click="handleOpenModal"
+        :title="displayAddress || 'Ver localização'"
+      >
+        📍
+      </button>
+    </div>
 
     <label class="task-label">
       <input type="checkbox" :checked="task.done" @change="$emit('toggle', task.id)" />
@@ -21,9 +51,17 @@
 
   <dialog v-if="showImage" open class="image-dialog" @click.self="showImage = false">
     <div class="dialog-content">
-      <img :src="task.img_url" alt="Imagem da tarefa" class="dialog-img" />
+      <span
+        v-if="task.location_label"
+        class="task-location-tag"
+        :title="task.location_label"
+      >
+        📍 {{ task.location_label }}
+      </span>
 
-      <!-- Bloco de Geolocalização (exibido apenas se existirem coordenadas válidas) -->
+      <img v-if="task.img_url" :src="task.img_url" alt="Imagem da tarefa" class="dialog-img" />
+
+      <!-- Bloco de Geolocalização -->
       <div v-if="hasGeolocation" class="dialog-geo-info">
         <div class="geo-header">
           <span class="geo-icon">📍</span>
@@ -31,8 +69,14 @@
         </div>
 
         <ul class="geo-details">
+          <li v-if="displayAddress"><strong>Endereço:</strong> {{ displayAddress }}</li>
           <li><strong>Coordenadas:</strong> {{ formattedCoordinates }}</li>
-          <li v-if="task.geolocation_accuracy !== undefined && task.geolocation_accuracy !== null">
+          <li
+            v-if="
+              task.geolocation_accuracy !== undefined &&
+              task.geolocation_accuracy !== null
+            "
+          >
             <strong>Precisão:</strong> ~{{ Math.round(task.geolocation_accuracy) }}m
           </li>
           <li v-if="task.geolocation_timestamp">
@@ -40,7 +84,12 @@
           </li>
         </ul>
 
-        <a :href="googleMapsUrl" target="_blank" rel="noopener noreferrer" class="maps-link">
+        <a
+          :href="googleMapsUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="maps-link"
+        >
           🗺️ Abrir no Google Maps
         </a>
       </div>
@@ -51,20 +100,21 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed } from "vue";
+import geocodingApi from "../api/geocodingApi.js";
 
-const showImage = ref(false)
+const showImage = ref(false);
+const fetchedAddress = ref("");
 
 const props = defineProps({
   task: {
     type: Object,
     required: true,
   },
-})
+});
 
-defineEmits(['toggle', 'remove', 'edit'])
+defineEmits(["toggle", "remove", "edit"]);
 
-// Computadas para a Geolocalização
 const hasGeolocation = computed(() => {
   return (
     props.task.latitude !== null &&
@@ -72,34 +122,51 @@ const hasGeolocation = computed(() => {
     props.task.longitude !== null &&
     props.task.longitude !== undefined &&
     (props.task.latitude !== 0 || props.task.longitude !== 0)
-  )
-})
+  );
+});
+
+const displayAddress = computed(() => {
+  return props.task.location_label || fetchedAddress.value;
+});
 
 const formattedCoordinates = computed(() => {
-  if (!hasGeolocation.value) return ''
-  return `${props.task.latitude.toFixed(5)}, ${props.task.longitude.toFixed(5)}`
-})
+  if (!hasGeolocation.value) return "";
+  return `${props.task.latitude.toFixed(5)}, ${props.task.longitude.toFixed(5)}`;
+});
 
 const formattedTimestamp = computed(() => {
-  if (!props.task.geolocation_timestamp) return ''
-  const date = new Date(props.task.geolocation_timestamp)
-  return date.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-})
+  if (!props.task.geolocation_timestamp) return "";
+  const date = new Date(props.task.geolocation_timestamp);
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+});
 
 const googleMapsUrl = computed(() => {
-  if (!hasGeolocation.value) return '#'
-  return `https://www.google.com/maps?q=${props.task.latitude},${props.task.longitude}`
-})
+  if (!hasGeolocation.value) return "#";
+  return `https://www.google.com/maps?q=${props.task.latitude},${props.task.longitude}`;
+});
+
+async function handleOpenModal() {
+  showImage.value = true;
+
+  if (hasGeolocation.value && !props.task.location_label && !fetchedAddress.value) {
+    try {
+      fetchedAddress.value = "Buscando endereço...";
+      const res = await geocodingApi.reverse(props.task.latitude, props.task.longitude);
+      fetchedAddress.value = res?.label || "Endereço não identificado";
+    } catch {
+      fetchedAddress.value = "Endereço não disponível";
+    }
+  }
+}
 </script>
 
 <style scoped>
-/* Estrutura do item da lista */
 .task-item {
   display: flex;
   justify-content: space-between;
@@ -121,7 +188,35 @@ const googleMapsUrl = computed(() => {
   opacity: 0.55;
 }
 
-/* Área reativa do checkbox e texto */
+/* Indicadores laterais */
+.task-indicators {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.img-indicator,
+.geo-indicator-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #777;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.img-indicator:hover,
+.geo-indicator-btn:hover {
+  color: #642db8;
+  background-color: #f1edfa;
+}
+
 .task-label {
   display: flex;
   align-items: center;
@@ -131,7 +226,7 @@ const googleMapsUrl = computed(() => {
   min-width: 0;
 }
 
-.task-label input[type='checkbox'] {
+.task-label input[type="checkbox"] {
   width: 20px;
   height: 20px;
   accent-color: #642db8;
@@ -152,7 +247,6 @@ const googleMapsUrl = computed(() => {
   color: #888;
 }
 
-/* Botões de Ação laterais */
 .task-actions {
   display: flex;
   gap: 4px;
@@ -160,7 +254,8 @@ const googleMapsUrl = computed(() => {
   flex-shrink: 0;
 }
 
-.task-edit, .task-remove {
+.task-edit,
+.task-remove {
   background: none;
   border: none;
   cursor: pointer;
@@ -172,8 +267,9 @@ const googleMapsUrl = computed(() => {
 }
 
 .task-edit {
-  color: #4a90d9;
+  color: #642db8;
 }
+
 .task-edit:hover {
   background-color: #eaf2fb;
 }
@@ -181,31 +277,12 @@ const googleMapsUrl = computed(() => {
 .task-remove {
   color: #e74c3c;
 }
+
 .task-remove:hover {
   background-color: #fdecea;
 }
 
-/* Indicador com ícone de Câmera */
-.img-indicator {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #777;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  border-radius: 50%;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.img-indicator:hover {
-  color: #642db8;
-  background-color: #f1edfa;
-}
-
-/* --- MODAL / DIALOG CUSTOMIZADO --- */
+/* Modal */
 .image-dialog {
   position: fixed;
   top: 0;
@@ -236,6 +313,13 @@ const googleMapsUrl = computed(() => {
   animation: scaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.task-location-tag {
+  font-size: 0.85rem;
+  color: #642db8;
+  font-weight: 600;
+  text-align: center;
+}
+
 .dialog-img {
   width: 100%;
   max-width: 400px;
@@ -245,7 +329,6 @@ const googleMapsUrl = computed(() => {
   border: 1px solid #eee;
 }
 
-/* --- ESTILOS DA GEOLOCALIZAÇÃO NO MODAL --- */
 .dialog-geo-info {
   width: 100%;
   background-color: #f8f9fa;
@@ -285,7 +368,6 @@ const googleMapsUrl = computed(() => {
   text-decoration: underline;
 }
 
-/* Botão Fechar Estilizado */
 .btn-close-dialog {
   width: 100%;
   padding: 10px;
@@ -304,7 +386,6 @@ const googleMapsUrl = computed(() => {
   color: #212529;
 }
 
-/* Animação suave de entrada */
 @keyframes scaleUp {
   from {
     transform: scale(0.92);
@@ -316,7 +397,6 @@ const googleMapsUrl = computed(() => {
   }
 }
 
-/* --- MEDIA QUERY: MOBILE --- */
 @media (max-width: 480px) {
   .task-item {
     padding: 10px 12px;
