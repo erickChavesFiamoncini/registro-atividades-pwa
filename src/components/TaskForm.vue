@@ -80,6 +80,7 @@
         ao vivo.
       </p>
     </div>
+
     <div class="location-section">
       <div class="location-header">
         <strong>Localização</strong>
@@ -102,7 +103,15 @@
         {{ locationError }}
       </p>
 
-      <TaskLocationMap v-if="location" :location="location" />
+      <TaskLocationMap
+        v-if="location"
+        :location="location"
+        @location-change="handleMapLocationChange"
+      />
+
+      <p v-if="location" class="location-map-help">
+        💡 Você pode clicar no mapa ou arrastar o marcador para ajustar a localização.
+      </p>
 
       <button
         v-if="location"
@@ -141,6 +150,7 @@ const {
   requestCurrentLocation,
   setLocationFromTask,
   setLocationLabel,
+  setLocationPosition,
   clearLocation,
 } = useGeolocation();
 
@@ -189,11 +199,9 @@ async function handleImageChange(event) {
 
   try {
     const response = await tasksApi.uploadImage(file);
-
     imgAttachmentKey.value = response.data.attachment_key;
   } catch (err) {
     console.error("Erro ao fazer upload da imagem", err);
-
     previewUrl.value = null;
     imgAttachmentKey.value = null;
   } finally {
@@ -218,6 +226,7 @@ async function handleCameraCapture(file) {
     imgAttachmentKey.value = null;
   } finally {
     uploading.value = false;
+
     // Garante que o painel da câmera feche após a captura
     showCameraCapture.value = false;
   }
@@ -262,10 +271,14 @@ function handleCancel() {
 
 async function handleGetLocation() {
   const captured = await requestCurrentLocation();
+
   if (!captured) return;
 
   try {
-    const address = await geocodingApi.reverse(captured.latitude, captured.longitude);
+    const address = await geocodingApi.reverse(
+      captured.latitude,
+      captured.longitude
+    );
 
     if (address?.label) {
       setLocationLabel(address.label);
@@ -274,8 +287,36 @@ async function handleGetLocation() {
     }
   } catch (err) {
     console.error("Erro na busca do endereço:", err);
+
     locationError.value =
       "Localização obtida, mas não foi possível identificar o endereço.";
+  }
+}
+
+/**
+ * Executado quando o usuário clica no mapa ou arrasta o marcador.
+ *
+ * A localização original obtida pelo GPS continua sendo usada como
+ * ponto inicial, mas o usuário pode substituí-la por qualquer ponto
+ * escolhido no mapa.
+ */
+async function handleMapLocationChange({ latitude, longitude }) {
+  if (!location.value) return;
+
+  setLocationPosition(latitude, longitude);
+
+  try {
+    const address = await geocodingApi.reverse(latitude, longitude);
+
+    if (address?.label) {
+      setLocationLabel(address.label);
+    } else {
+      setLocationLabel("Endereço não encontrado");
+    }
+  } catch (err) {
+    console.error("Erro ao buscar endereço da nova localização:", err);
+
+    setLocationLabel("Endereço não identificado");
   }
 }
 </script>
@@ -413,9 +454,6 @@ async function handleGetLocation() {
   margin: 0;
 }
 
-.upload-status {
-  color: #888;
-}
 /* ==========================================================================
    Seção de Localização (TaskForm.vue)
    ========================================================================== */
@@ -496,6 +534,13 @@ async function handleGetLocation() {
   border-radius: 0 6px 6px 0;
   font-size: 0.85rem;
   color: #c53030;
+}
+
+.location-map-help {
+  margin: -4px 0 0;
+  font-size: 0.78rem;
+  color: #718096;
+  line-height: 1.4;
 }
 
 .location-remove-button {

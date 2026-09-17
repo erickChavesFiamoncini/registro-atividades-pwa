@@ -39,17 +39,32 @@
     </div>
 
     <label class="task-label">
-      <input type="checkbox" :checked="task.done" @change="$emit('toggle', task.id)" />
+      <input
+        type="checkbox"
+        :checked="task.done"
+        @change="$emit('toggle', task.id)"
+      />
+
       <span class="task-title">{{ task.title }}</span>
     </label>
 
     <div class="task-actions">
-      <button class="task-edit" @click="$emit('edit', task)">Editar</button>
-      <button class="task-remove" @click="$emit('remove', task.id)">Remover</button>
+      <button class="task-edit" @click="$emit('edit', task)">
+        Editar
+      </button>
+
+      <button class="task-remove" @click="$emit('remove', task.id)">
+        Remover
+      </button>
     </div>
   </div>
 
-  <dialog v-if="showImage" open class="image-dialog" @click.self="showImage = false">
+  <dialog
+    v-if="showImage"
+    open
+    class="image-dialog"
+    @click.self="showImage = false"
+  >
     <div class="dialog-content">
       <span
         v-if="task.location_label"
@@ -59,7 +74,12 @@
         📍 {{ task.location_label }}
       </span>
 
-      <img v-if="task.img_url" :src="task.img_url" alt="Imagem da tarefa" class="dialog-img" />
+      <img
+        v-if="task.img_url"
+        :src="task.img_url"
+        alt="Imagem da tarefa"
+        class="dialog-img"
+      />
 
       <!-- Bloco de Geolocalização -->
       <div v-if="hasGeolocation" class="dialog-geo-info">
@@ -69,16 +89,24 @@
         </div>
 
         <ul class="geo-details">
-          <li v-if="displayAddress"><strong>Endereço:</strong> {{ displayAddress }}</li>
-          <li><strong>Coordenadas:</strong> {{ formattedCoordinates }}</li>
+          <li v-if="displayAddress">
+            <strong>Endereço:</strong> {{ displayAddress }}
+          </li>
+
+          <li>
+            <strong>Coordenadas:</strong> {{ formattedCoordinates }}
+          </li>
+
           <li
             v-if="
               task.geolocation_accuracy !== undefined &&
               task.geolocation_accuracy !== null
             "
           >
-            <strong>Precisão:</strong> ~{{ Math.round(task.geolocation_accuracy) }}m
+            <strong>Precisão:</strong>
+            ~{{ Math.round(task.geolocation_accuracy) }}m
           </li>
+
           <li v-if="task.geolocation_timestamp">
             <strong>Data/Hora:</strong> {{ formattedTimestamp }}
           </li>
@@ -94,7 +122,9 @@
         </a>
       </div>
 
-      <button class="btn-close-dialog" @click="showImage = false">Fechar</button>
+      <button class="btn-close-dialog" @click="showImage = false">
+        Fechar
+      </button>
     </div>
   </dialog>
 </template>
@@ -131,13 +161,28 @@ const displayAddress = computed(() => {
 
 const formattedCoordinates = computed(() => {
   if (!hasGeolocation.value) return "";
+
   return `${props.task.latitude.toFixed(5)}, ${props.task.longitude.toFixed(5)}`;
 });
 
 const formattedTimestamp = computed(() => {
   if (!props.task.geolocation_timestamp) return "";
-  const date = new Date(props.task.geolocation_timestamp);
+
+  let rawValue = props.task.geolocation_timestamp;
+
+  if (
+    typeof rawValue === "string" &&
+    !rawValue.endsWith("Z") &&
+    !rawValue.includes("+") &&
+    !rawValue.includes("-")
+  ) {
+    rawValue += "Z";
+  }
+
+  const date = new Date(rawValue);
+
   return date.toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -148,17 +193,28 @@ const formattedTimestamp = computed(() => {
 
 const googleMapsUrl = computed(() => {
   if (!hasGeolocation.value) return "#";
+
   return `https://www.google.com/maps?q=${props.task.latitude},${props.task.longitude}`;
 });
 
 async function handleOpenModal() {
   showImage.value = true;
 
-  if (hasGeolocation.value && !props.task.location_label && !fetchedAddress.value) {
+  if (
+    hasGeolocation.value &&
+    !props.task.location_label &&
+    !fetchedAddress.value
+  ) {
     try {
       fetchedAddress.value = "Buscando endereço...";
-      const res = await geocodingApi.reverse(props.task.latitude, props.task.longitude);
-      fetchedAddress.value = res?.label || "Endereço não identificado";
+
+      const res = await geocodingApi.reverse(
+        props.task.latitude,
+        props.task.longitude
+      );
+
+      fetchedAddress.value =
+        res?.label || "Endereço não identificado";
     } catch {
       fetchedAddress.value = "Endereço não disponível";
     }
@@ -189,6 +245,7 @@ async function handleOpenModal() {
 }
 
 /* Indicadores laterais */
+
 .task-indicators {
   display: flex;
   align-items: center;
@@ -283,6 +340,7 @@ async function handleOpenModal() {
 }
 
 /* Modal */
+
 .image-dialog {
   position: fixed;
   top: 0;
@@ -391,6 +449,7 @@ async function handleOpenModal() {
     transform: scale(0.92);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
