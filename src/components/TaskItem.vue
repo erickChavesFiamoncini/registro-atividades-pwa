@@ -4,7 +4,7 @@
     <div class="task-indicators">
       <!-- Ícone de Câmera (exibido se houver imagem) -->
       <button
-        v-if="task.img_url"
+        v-if="hasImage"
         class="img-indicator"
         @click="handleOpenModal"
         title="Ver imagem e localização"
@@ -60,14 +60,14 @@
   </div>
 
   <dialog
-    v-if="showImage"
+    v-if="showImage && (hasImage || hasGeolocation)"
     open
     class="image-dialog"
     @click.self="showImage = false"
   >
     <div class="dialog-content">
       <span
-        v-if="task.location_label"
+        v-if="hasGeolocation && task.location_label"
         class="task-location-tag"
         :title="task.location_label"
       >
@@ -75,7 +75,7 @@
       </span>
 
       <img
-        v-if="task.img_url"
+        v-if="hasImage"
         :src="task.img_url"
         alt="Imagem da tarefa"
         class="dialog-img"
@@ -143,6 +143,8 @@ const props = defineProps({
   },
 });
 
+defineEmits(["toggle", "remove", "edit"]);
+
 watch(
   () => props.task,
   () => {
@@ -151,7 +153,16 @@ watch(
   { deep: true }
 );
 
-defineEmits(["toggle", "remove", "edit"]);
+const hasImage = computed(() => {
+  const url = props.task.img_url;
+
+  if (!url) return false;
+  if (typeof url === "string" && (url.trim() === "" || url === "null" || url === "undefined")) {
+    return false;
+  }
+
+  return true;
+});
 
 const hasGeolocation = computed(() => {
   const lat = props.task.latitude;
@@ -175,13 +186,14 @@ const hasGeolocation = computed(() => {
 });
 
 const displayAddress = computed(() => {
+  if (!hasGeolocation.value) return "";
   return props.task.location_label || fetchedAddress.value;
 });
 
 const formattedCoordinates = computed(() => {
   if (!hasGeolocation.value) return "";
 
-  return `${props.task.latitude.toFixed(5)}, ${props.task.longitude.toFixed(5)}`;
+  return `${Number(props.task.latitude).toFixed(5)}, ${Number(props.task.longitude).toFixed(5)}`;
 });
 
 const formattedTimestamp = computed(() => {
@@ -217,6 +229,8 @@ const googleMapsUrl = computed(() => {
 });
 
 async function handleOpenModal() {
+  if (!hasImage.value && !hasGeolocation.value) return;
+
   showImage.value = true;
 
   if (

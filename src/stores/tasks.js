@@ -30,11 +30,8 @@ export const useTasksStore = defineStore('tasks', () => {
     try {
       const response = await tasksApi.create(payload)
 
-      // Pegamos a tarefa que o backend acabou de criar
       const newTask = response.data
 
-      // Se o backend não nos devolveu a propriedade 'img_url' pronta,
-      // nós usamos o preview local que o navegador já tem na memória!
       if (!newTask.img_url && payload.previewUrl) {
         newTask.img_url = payload.previewUrl
       }
@@ -82,7 +79,26 @@ export const useTasksStore = defineStore('tasks', () => {
       const index = tasks.value.findIndex((t) => t.id === id)
 
       if (index !== -1) {
-        tasks.value[index] = response.data
+        // Unimos a resposta da API garantindo que, se o payload mandou img_url ou localização como null/undefined,
+        // o estado local seja sobrescrito imediatamente.
+        const updatedTask = {
+          ...tasks.value[index],
+          ...response.data,
+        }
+
+        if (payload.img_url === null) {
+          updatedTask.img_url = null;
+        }
+
+        if (payload.latitude === null) {
+          updatedTask.latitude = null;
+          updatedTask.longitude = null;
+          updatedTask.location_label = null;
+          updatedTask.geolocation_accuracy = null;
+          updatedTask.geolocation_timestamp = null;
+        }
+
+        tasks.value[index] = updatedTask
       }
     } catch (err) {
       error.value = 'Erro ao editar tarefa.'

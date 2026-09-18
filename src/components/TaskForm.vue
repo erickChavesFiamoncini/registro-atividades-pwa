@@ -33,11 +33,21 @@
     <div class="image-section">
 
       <img
-        v-if="previewUrl || editingTask?.img_url"
-        :src="previewUrl || editingTask?.img_url"
+        v-if="currentImageSrc"
+        :src="currentImageSrc"
         class="image-preview"
         alt="Imagem da tarefa"
       />
+
+      <button
+        v-if="currentImageSrc"
+        type="button"
+        class="image-remove-button"
+        :disabled="uploading"
+        @click="handleRemoveImage"
+      >
+        Remover imagem
+      </button>
 
       <label
         v-if="!showCameraCapture"
@@ -50,7 +60,7 @@
 
         <span v-else>
           {{
-            previewUrl || editingTask?.img_url
+            currentImageSrc
               ? "📁 Trocar imagem"
               : "📁 Adicionar imagem"
           }}
@@ -190,7 +200,7 @@
 
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, computed, watch } from "vue";
 
 import tasksApi from "../api/tasksApi.js";
 import CameraCapture from "./CameraCapture.vue";
@@ -236,8 +246,6 @@ const {
 
 const newTask = ref("");
 
-
-
 /* =========================
    IMAGEM
    ========================= */
@@ -246,6 +254,26 @@ const previewUrl = ref(null);
 const imgAttachmentKey = ref(null);
 const uploading = ref(false);
 const showCameraCapture = ref(false);
+const removeImageRequested = ref(false);
+
+const currentImageSrc = computed(() => {
+  if (removeImageRequested.value) {
+    return null;
+  }
+  return previewUrl.value || props.editingTask?.img_url || null;
+});
+
+function handleRemoveImage() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value);
+  }
+  previewUrl.value = null;
+  imgAttachmentKey.value = null;
+
+  if (props.editingTask) {
+    removeImageRequested.value = true;
+  }
+}
 
 
 
@@ -255,7 +283,6 @@ const showCameraCapture = ref(false);
 
 const addressInput = ref("");
 const loadingAddress = ref(false);
-
 
 
 /* =========================
@@ -277,6 +304,7 @@ watch(
 
     previewUrl.value = null;
     imgAttachmentKey.value = null;
+    removeImageRequested.value = false;
     showCameraCapture.value = false;
 
     addressInput.value = "";
@@ -300,8 +328,6 @@ watch(
   }
 );
 
-
-
 /* =========================
    UPLOAD DE IMAGEM
    ========================= */
@@ -314,13 +340,13 @@ async function handleImageChange(event) {
     return;
   }
 
-
   if (previewUrl.value) {
     URL.revokeObjectURL(previewUrl.value);
   }
 
 
   previewUrl.value = URL.createObjectURL(file);
+  removeImageRequested.value = false;
 
   uploading.value = true;
 
@@ -349,8 +375,6 @@ async function handleImageChange(event) {
   }
 }
 
-
-
 /* =========================
    CÂMERA
    ========================= */
@@ -363,6 +387,7 @@ async function handleCameraCapture(file) {
 
 
   previewUrl.value = URL.createObjectURL(file);
+  removeImageRequested.value = false;
 
   uploading.value = true;
 
@@ -393,8 +418,6 @@ async function handleCameraCapture(file) {
   }
 }
 
-
-
 /* =========================
    BUSCAR ENDEREÇO
    ========================= */
@@ -407,16 +430,13 @@ async function handleAddressSearch() {
     return;
   }
 
-
   loadingAddress.value = true;
   locationError.value = "";
-
 
   try {
 
     const result =
       await geocodingApi.search(query);
-
 
     if (!result) {
 
@@ -426,7 +446,6 @@ async function handleAddressSearch() {
 
       return;
     }
-
 
     /*
      * Cria a localização usando as coordenadas
@@ -474,8 +493,6 @@ async function handleAddressSearch() {
   }
 }
 
-
-
 /* =========================
    MUDANÇA PELO MAPA
    ========================= */
@@ -521,7 +538,6 @@ async function handleMapLocationChanged(newLocation) {
     label: null,
 
   };
-
 
   /*
    * Descobre o endereço correspondente à
@@ -570,74 +586,61 @@ async function handleMapLocationChanged(newLocation) {
   }
 }
 
-
+/* =========================
+   SALVAR TAREFA
+   ========================= */
 
 /* =========================
    SALVAR TAREFA
    ========================= */
 
 function handleSubmit() {
-
   if (!newTask.value.trim()) {
     return;
   }
 
+  const locationPayload = buildLocationPayload(location.value);
 
-const locationPayload = buildLocationPayload(location.value);
+  // Define os valores de imagem com base no estado de remoção
+  let finalImgAttachmentKey = imgAttachmentKey.value;
+  let finalImgUrl = undefined;
 
-const payload = {
-  title: newTask.value.trim(),
-  img_attachment_key: imgAttachmentKey.value,
+  if (removeImageRequested.value) {
+    finalImgAttachmentKey = null;
+    finalImgUrl = null; // Garante que envie 'null' explicitamente para o backend limpar o campo no DB
+  }
 
-  latitude: locationPayload.latitude ?? null,
-  longitude: locationPayload.longitude ?? null,
-  geolocation_accuracy: locationPayload.geolocation_accuracy ?? null,
-  geolocation_timestamp: locationPayload.geolocation_timestamp ?? null,
-  location_label: locationPayload.location_label ?? null,
-};
+  const payload = {
+    title: newTask.value.trim(),
+    img_attachment_key: finalImgAttachmentKey,
+    img_url: finalImgUrl,
+
+    latitude: locationPayload.latitude ?? null,
+    longitude: locationPayload.longitude ?? null,
+    geolocation_accuracy: locationPayload.geolocation_accuracy ?? null,
+    geolocation_timestamp: locationPayload.geolocation_timestamp ?? null,
+    location_label: locationPayload.location_label ?? null,
+  };
 
   if (props.editingTask) {
-
-    emit(
-      "update",
-      props.editingTask.id,
-      payload
-    );
-
+    emit("update", props.editingTask.id, payload);
   } else {
-
-    emit(
-      "add",
-      payload
-    );
-
+    emit("add", payload);
   }
 
-
-  /*
-   * Limpa o formulário.
-   */
-
+  // Limpa o formulário...
   newTask.value = "";
 
-
   if (previewUrl.value) {
-    URL.revokeObjectURL(
-      previewUrl.value
-    );
+    URL.revokeObjectURL(previewUrl.value);
   }
 
-
   previewUrl.value = null;
-
   imgAttachmentKey.value = null;
-
+  removeImageRequested.value = false;
   showCameraCapture.value = false;
-
   addressInput.value = "";
-
   clearLocation();
-
 }
 
 
@@ -663,6 +666,8 @@ function handleCancel() {
   previewUrl.value = null;
 
   imgAttachmentKey.value = null;
+
+  removeImageRequested.value = false;
 
   showCameraCapture.value = false;
 
@@ -881,6 +886,41 @@ async function handleGetLocation() {
   border: 1px solid #ddd;
 
   flex-shrink: 0;
+}
+
+
+.image-remove-button {
+  padding: 8px 12px;
+
+  background-color: #fff5f5;
+
+  color: #e53e3e;
+
+  border: 1px solid #fed7d7;
+
+  border-radius: 6px;
+
+  font-size: 0.85rem;
+
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition: all 0.2s;
+}
+
+
+.image-remove-button:hover:not(:disabled) {
+  background-color: #fed7d7;
+
+  color: #c53030;
+}
+
+
+.image-remove-button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
 }
 
 
