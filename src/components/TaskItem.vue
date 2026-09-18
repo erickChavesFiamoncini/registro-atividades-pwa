@@ -130,7 +130,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import geocodingApi from "../api/geocodingApi.js";
 
 const showImage = ref(false);
@@ -143,15 +143,34 @@ const props = defineProps({
   },
 });
 
+watch(
+  () => props.task,
+  () => {
+    fetchedAddress.value = "";
+  },
+  { deep: true }
+);
+
 defineEmits(["toggle", "remove", "edit"]);
 
 const hasGeolocation = computed(() => {
+  const lat = props.task.latitude;
+  const lng = props.task.longitude;
+
+  // Garante que ambos existam, não sejam nulos ou vazios
+  if (lat === null || lat === undefined || lng === null || lng === undefined) {
+    return false;
+  }
+
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+
+  // Garante que são números válidos e que NÃO são zero (0, 0)
   return (
-    props.task.latitude !== null &&
-    props.task.latitude !== undefined &&
-    props.task.longitude !== null &&
-    props.task.longitude !== undefined &&
-    (props.task.latitude !== 0 || props.task.longitude !== 0)
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude !== 0 &&
+    longitude !== 0
   );
 });
 

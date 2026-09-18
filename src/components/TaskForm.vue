@@ -583,19 +583,18 @@ function handleSubmit() {
   }
 
 
-  const payload = {
+const locationPayload = buildLocationPayload(location.value);
 
-    title: newTask.value.trim(),
+const payload = {
+  title: newTask.value.trim(),
+  img_attachment_key: imgAttachmentKey.value,
 
-    img_attachment_key:
-      imgAttachmentKey.value,
-
-    ...buildLocationPayload(
-      location.value
-    ),
-
-  };
-
+  latitude: locationPayload.latitude ?? null,
+  longitude: locationPayload.longitude ?? null,
+  geolocation_accuracy: locationPayload.geolocation_accuracy ?? null,
+  geolocation_timestamp: locationPayload.geolocation_timestamp ?? null,
+  location_label: locationPayload.location_label ?? null,
+};
 
   if (props.editingTask) {
 
